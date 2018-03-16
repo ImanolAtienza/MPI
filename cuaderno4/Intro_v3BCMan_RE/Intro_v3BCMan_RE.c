@@ -16,7 +16,7 @@ void MI_MPI_Bcast(int n, int vec[n], MPI_Datatype tipo, int root, MPI_Comm comm)
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     req = malloc(sizeof(MPI_Request)*nprocs);
-    vstatus = malloc(sizeof(MPI_Status)*nprocs); // Ejemplo de acceso, vstatus[3].MPI_SOURCE
+    vstatus = malloc(sizeof(MPI_Status)*nprocs);
 
     if (rank == 0)  // root
     {
@@ -31,7 +31,6 @@ void MI_MPI_Bcast(int n, int vec[n], MPI_Datatype tipo, int root, MPI_Comm comm)
      MPI_Wait(&req[root], &vstatus[root]);	
     } else  // resto procesos
     {
-    	//printf("Sale aqui %d\n", vec[root]);
       MPI_Irecv(vec, n, tipo,
                root, 2, comm,
                &req[root]);
