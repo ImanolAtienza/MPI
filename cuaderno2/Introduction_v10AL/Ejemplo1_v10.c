@@ -48,7 +48,7 @@ void Ejemplo1_v10 (MPI_Comm comm, int n, int vec[n])
 	 i = 2;
      while (i <= nprocs-1)
      {
-	  MPI_Improbe(i, 2, comm, &flag, &mensaje, &vstatus[1]); 
+	  MPI_Improbe(i, 2, comm, &flag, &mensaje, &vstatus[i]); 
 	  if(flag==1) {
 		  MPI_Imrecv(&tmp[i], 1, MPI_INT, &mensaje, &req[i]);
 		  //print '(4(A,I4))', 'rank ',rank, ' desde ',start, ' hasta ',fin, ' sum ', sum
@@ -59,7 +59,7 @@ void Ejemplo1_v10 (MPI_Comm comm, int n, int vec[n])
      i = 1;
      while (i <= nprocs-1)
      {
-	  MPI_Improbe(i, 2, comm, &flag, &mensaje, &vstatus[1]); 
+	  MPI_Improbe(i, 2, comm, &flag, &mensaje, &vstatus[i]); 
 	  if(flag==1) {
 		  MPI_Imrecv(&tmp[i], 1, MPI_INT, &mensaje, &req[i]);
 		  //print '(4(A,I4))', 'rank ',rank, ' desde ',start, ' hasta ',fin, ' sum ', sum
