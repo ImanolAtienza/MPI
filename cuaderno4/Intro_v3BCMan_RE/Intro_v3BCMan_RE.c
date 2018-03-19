@@ -23,20 +23,21 @@ void MI_MPI_Bcast(int n, int vec[n], MPI_Datatype tipo, int root, MPI_Comm comm)
      for (i = 0; i <= nprocs-1; i++)
      {
       MPI_Isend (vec, n, tipo,
-                 i, 2, comm, &req[root]);
+                 i, 2, comm, &req[i]);
      }
      MPI_Irecv(vec, n, tipo,
                root, 2, comm,
-               &req[root]); 
-     MPI_Wait(&req[root], &vstatus[root]);	
+               &req[rank]); 
+	
+     MPI_Waitall(nprocs, req, vstatus);	
     } else  // resto procesos
     {
     	//printf("Sale aqui %d\n", vec[root]);
       MPI_Irecv(vec, n, tipo,
                root, 2, comm,
-               &req[root]);
+               &req[rank]);
 
-      MPI_Wait(&req[root],&vstatus[root]);
+      MPI_Wait(&req[rank],&vstatus[rank]);
     }
     free(req);
     free(vstatus);
