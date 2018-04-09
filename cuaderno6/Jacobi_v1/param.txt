@@ -1,0 +1,20 @@
+  size_x
+300
+  size_y
+600
+  factor_escala
+1.0e1
+  temp_ambiente
+-10.0
+  MaxStep
+2000
+  dt
+1.0e-1
+  cnv_tol
+1.0e-4
+
+
+
+
+
+

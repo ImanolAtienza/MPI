@@ -1,0 +1,65 @@
+  size_x
+300
+  size_y
+600
+  factor_escala
+1.0e1
+  temp_ambiente
+26.0
+  MaxStep
+2000
+  dt
+1.0e-1
+  cnv_tol
+1.0e-4
+  numero_chips
+2
+     chip1_coor_x
+8
+     chip1_coor_y
+45
+     chip1_size_x
+7
+     chip1_size_y
+10
+     chip1_temp_ini
+80
+     chip1_temp_max
+100.0
+     chip2_coor_x
+23
+     chip2_coor_y
+27
+     chip2_size_x
+5
+     chip2_size_y
+8
+     chip2_temp_ini
+60
+     chip2_temp_max
+100.0
+  cool_coor_x
+25
+  cool_coor_y
+50
+  cool_size_x
+4
+  cool_size_y
+8
+  cool_temp_ini
+5
+  fan_coor_x
+10
+  fan_coor_y
+9
+  fan_size_x
+3
+  fan_size_y
+51
+  fan_temp_ini
+10
+
+
+
+
+

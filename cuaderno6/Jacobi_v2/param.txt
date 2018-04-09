@@ -1,0 +1,31 @@
+  size_x
+300
+  size_y
+600
+  factor_escala
+1.0e1
+  temp_ambiente
+20.0
+  MaxStep
+2000
+  dt
+1.0e-1
+  cnv_tol
+1.0e-4
+  chip_coor_x
+8
+  chip_coor_y
+45
+  chip_size_x
+7
+  chip_size_y
+10
+  chip_temp_ini
+80
+  chip_temp_max
+100.0
+
+
+
+
+

@@ -1,0 +1,113 @@
+  size_x
+300
+  size_y
+600
+  factor_escala
+1.0e1
+  temp_ambiente
+30.0
+  MaxStep
+2000
+  dt
+1.0e-1
+  cnv_tol
+1.0e-4
+  numero_chips
+2
+     chip1_coor_x
+8
+     chip1_coor_y
+45
+     chip1_size_x
+7
+     chip1_size_y
+10
+     chip1_temp_ini
+80
+     chip1_temp_max
+100.0
+     chip2_coor_x
+23
+     chip2_coor_y
+27
+     chip2_size_x
+5
+     chip2_size_y
+8
+     chip2_temp_ini
+60
+     chip2_temp_max
+100.0
+  numero_cool
+2
+    cool1_coor_x
+8
+    cool1_coor_y
+45
+    cool1_size_x
+7
+    cool1_size_y
+10
+    cool1_temp_ini
+30
+    cool2_coor_x
+23
+    cool2_coor_y
+27
+    cool2_size_x
+5
+    cool2_size_y
+8
+    cool2_temp_ini
+40
+  numero_fan
+2
+   fan1_coor_x
+10
+   fan1_coor_y
+9
+   fan1_size_x
+3
+   fan1_size_y
+51
+   fan1_temp_ini
+24
+   fan1_disi_size
+2
+   fan1_disi_temp
+35
+   fan2_coor_x
+18
+   fan2_coor_y
+9
+   fan2_size_x
+3
+   fan2_size_y
+51
+   fan2_temp_ini
+24
+   fan1_disi_size
+2
+   fan1_disi_temp
+35
+  numero_airext
+2
+   airext1_coor_x
+3
+   airext1_size_x
+3
+   airext1_temp_ini
+20
+   airext1_delta
+0.01
+   airext2_coor_x
+25
+   airext2_size_x
+3
+   airext2_temp_ini
+20
+   airext2_delta
+0.01
+
+
+
