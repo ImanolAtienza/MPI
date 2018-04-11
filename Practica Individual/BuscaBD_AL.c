@@ -52,8 +52,8 @@ int main (int argc, char** argv)
   MPI_Aint offset[4];
   MPI_Datatype types[4], tipoStruct;
   MPI_Comm comm;
-  //MPI_Request *req;
-  //MPI_Status *vstatus;
+  MPI_Request req;
+  MPI_Status vstatus;
 
   MPI_Init(&argc, &argv);
 
@@ -66,8 +66,6 @@ int main (int argc, char** argv)
 
   numElemnt = malloc(sizeof(int) * nprocs);
   desp = malloc(sizeof(int) * nprocs);
-  //req = malloc(sizeof(MPI_Request) * nprocs);
-  //vstatus = malloc(sizeof(MPI_Status) * nprocs);
   
   offset[0] = offsetof(Elemento, Producto);
   offset[1] = offsetof(Elemento, identificador);
@@ -106,7 +104,7 @@ int main (int argc, char** argv)
 
     t0 = MPI_Wtime ();
     
-    vectorBD = vectorBDAux = malloc(sizeof(Elemento) * sizeBD);
+    vectorBD = malloc(sizeof(Elemento) * sizeBD);
     vectorElementos = malloc(sizeof(int) * elementS);
 
     Leer_datos(vectorBD, sizeBD, elementS, vectorElementos, (unsigned) time(&t));
@@ -119,16 +117,16 @@ int main (int argc, char** argv)
 
     MPI_Pack(&sizeBD, 1, MPI_INT, buf, tamBuf, &pos, comm);
     MPI_Pack(&elementS, 1, MPI_INT, buf, tamBuf, &pos, comm);
-    MPI_Bcast (buf, tamBuf, MPI_PACKED, root, comm);
-    //MPI_Wait(&req[rank],&vstatus[rank]); 
+    MPI_Ibcast (buf, tamBuf, MPI_PACKED, root, comm, &req);
+    MPI_Wait(&req, &vstatus); 
   } else {
-    MPI_Bcast (buf, tamBuf, MPI_PACKED, root, comm);
-    //MPI_Wait(&req[rank],&vstatus[rank]);
+    MPI_Ibcast (buf, tamBuf, MPI_PACKED, root, comm, &req);
+    MPI_Wait(&req, &vstatus);
     MPI_Unpack (buf, tamBuf, &pos, &sizeBD, 1, MPI_INT, comm);
     MPI_Unpack (buf, tamBuf, &pos, &elementS, 1, MPI_INT, comm);
 
-    vectorBD = vectorBDAux = malloc(sizeof(Elemento) * sizeBD);
-    vectorElementos = malloc(sizeof(int) * elementS);    
+    vectorElementos = malloc(sizeof(int) * elementS);
+    vectorBD = malloc(sizeof(Elemento) * sizeBD);    
   }
 
   //printf("Soy %d y tengo tam_bd %d y elem_Bus %d\n", rank, sizeBD, elementS);
@@ -137,8 +135,8 @@ int main (int argc, char** argv)
       Repartir a los clones el vector de busqueda
   **/
 
-  MPI_Bcast (vectorElementos, elementS, MPI_INT, root, comm);
-  //MPI_Wait(&req[rank],&vstatus[rank]);
+  MPI_Ibcast (vectorElementos, elementS, MPI_INT, root, comm, &req);
+  
 
   /**
         Comprobar que se ha repartido bien, el vector de busqueda.
@@ -176,7 +174,7 @@ int main (int argc, char** argv)
   for(i = 0; i < nprocs; i++)
   	desp[i] = desp[i-1] + numElemnt[i-1]; 
 
- /* if(rank == root) {
+  /*if(rank == root) {
 	  printf("Bloques\n");
 	  for(i = 0; i < nprocs; i++) 
 	  	printf("%d - ", numElemnt[i]);
@@ -190,6 +188,9 @@ int main (int argc, char** argv)
 	  printf("\n");
   }*/
 
+  MPI_Wait(&req, &vstatus);
+
+  vectorBDAux = malloc(sizeof(Elemento) * numElemnt[rank]);
   MPI_Scatterv(vectorBD, numElemnt, desp, tipoStruct, vectorBDAux, numElemnt[rank], tipoStruct, root, comm);
 
   /**
@@ -197,8 +198,8 @@ int main (int argc, char** argv)
         Utiliza una BD pequena para comprobar.
   **/
 
-  /*for(i = 0; i < numElemnt[rank]; i++)
-  	printf("Soy %d tengo en la bd %s, %d, %f\n", rank, vectorBDAux[i].Producto, vectorBDAux[i].identificador, vectorBDAux[i].euros);*/
+  //for(i = 0; i < numElemnt[rank]; i++)
+  	//printf("Soy %d tengo en la bd %s, %d, %f\n", rank, vectorBDAux[i].Producto, vectorBDAux[i].identificador, vectorBDAux[i].euros);
 
   if(rank == root) {
   	t1 = MPI_Wtime ();
@@ -301,6 +302,10 @@ int main (int argc, char** argv)
   free(vectorBD);
   free(numElemnt);
   free(desp);
+
+  if(rank == root)
+  	printf("Fin del Programa\n");
+
   MPI_Finalize();
   return (0);
 } /*  main  */
