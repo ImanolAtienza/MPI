@@ -43,12 +43,12 @@ extern   Leer_datos (Elemento *v_Elementos, int n_Elementos,
 
 int main (int argc, char** argv)
 {
-  int i, rank, nprocs, sizeBD, elementS, root, pos, *vectorElementos, *numElemnt, *desp, bLength[4], stride, resto;
+  int i, j, k, rank, nprocs, sizeBD, elementS, root, pos, *vectorElementos, *numElemnt, *desp, bLength[4], stride, resto;
   int tamBuf = 1024;
   char buf[tamBuf];
   double t0, t1;
   time_t t;
-  Elemento *vectorBD, *vectorBDAux;
+  Elemento *vectorBD, *vectorBDAux, *vectorElementosEn;
   MPI_Aint offset[4];
   MPI_Datatype types[4], tipoStruct;
   MPI_Comm comm;
@@ -102,7 +102,7 @@ int main (int argc, char** argv)
     scanf("%d", &elementS);
     printf("\n");
 
-    t0 = MPI_Wtime ();
+    t0 = MPI_Wtime();
     
     vectorBD = malloc(sizeof(Elemento) * sizeBD);
     vectorElementos = malloc(sizeof(int) * elementS);
@@ -125,8 +125,7 @@ int main (int argc, char** argv)
     MPI_Unpack (buf, tamBuf, &pos, &sizeBD, 1, MPI_INT, comm);
     MPI_Unpack (buf, tamBuf, &pos, &elementS, 1, MPI_INT, comm);
 
-    vectorElementos = malloc(sizeof(int) * elementS);
-    vectorBD = malloc(sizeof(Elemento) * sizeBD);    
+    vectorElementos = malloc(sizeof(int) * elementS);   
   }
 
   //printf("Soy %d y tengo tam_bd %d y elem_Bus %d\n", rank, sizeBD, elementS);
@@ -189,7 +188,6 @@ int main (int argc, char** argv)
   }*/
 
   MPI_Wait(&req, &vstatus);
-
   vectorBDAux = malloc(sizeof(Elemento) * numElemnt[rank]);
   MPI_Scatterv(vectorBD, numElemnt, desp, tipoStruct, vectorBDAux, numElemnt[rank], tipoStruct, root, comm);
 
@@ -202,7 +200,7 @@ int main (int argc, char** argv)
   	//printf("Soy %d tengo en la bd %s, %d, %f\n", rank, vectorBDAux[i].Producto, vectorBDAux[i].identificador, vectorBDAux[i].euros);
 
   if(rank == root) {
-  	t1 = MPI_Wtime ();
+  	t1 = MPI_Wtime();
   	printf("\nTiempo de ejecucion en rank %d = %1.3f ms\nFin Fase 1\n\n", rank, (t1-t0) * 1000);
   }
 
@@ -212,12 +210,17 @@ int main (int argc, char** argv)
 /****    FASE 2     ****/
 /***********************/
 
+  t0 = MPI_Wtime();
+
  /**
     Eliminar/liberar memoria de la estructura con toda la BD que poseia el root.
     Solo quedaran los BD locales distribuidas en los clones.
     Si en la version anterior la liberabas al final del programa,
      quita el free del final para que no te de error
  **/
+
+  if(rank == root)
+  	free(vectorBD);
 
  /**
      BUSQUEDA DISTRIBUIDA EN LA BD DE LOS IDENTIFICADORES DEL VECTOR DE BUSQUEDA.
@@ -227,6 +230,40 @@ int main (int argc, char** argv)
      Reservar una estructura local con los elementos de la BD que el clon haya encontrado.
   */
 
+  k = 0;
+  vectorElementosEn = malloc(sizeof(Elemento));
+  for(i = 0; i < elementS; i++)
+  	for(j = 0; j < numElemnt[rank]; j++) {
+  		if(vectorElementos[i] == vectorBDAux[j].identificador) {
+  			vectorElementosEn[k].identificador = vectorBDAux[j].identificador;
+  			vectorElementosEn[k].euros = vectorBDAux[j].euros;
+  			strcpy(vectorElementosEn[k].Producto, vectorBDAux[j].Producto);
+  			//*&vectorElementosEn[k] = vectorBDAux[j];
+  			k++;
+  			vectorElementosEn = (Elemento *) realloc(vectorElementosEn, (sizeof(Elemento) * (k + 1)));
+  			break;
+  		}
+
+  	}
+
+  printf("Vector de busqueda en %d\n", rank);
+  for(i = 0; i < elementS; i++)
+  	printf("%d - ", vectorElementos[i]);
+
+  printf("\n");
+
+  printf("vectorBDAux en %d\n", rank);
+  for(i = 0; i < numElemnt[rank]; i++)
+  	printf("%d - ", vectorBDAux[i].identificador);
+
+  printf("\n\n");
+
+ // int n = sizeof(vectorElementosEn) / sizeof(Elemento);
+  printf("Identificadores encontrados en %d tamanio de vector es %d\n", rank, k);
+  for(i = 0; i < k; i++)
+  	printf("%d - ", vectorElementosEn[i].identificador);
+
+  printf("\n");
 
   /**
      Todos los clones enviarán sus resultados al root.
@@ -239,6 +276,11 @@ int main (int argc, char** argv)
       Comprobar que la búsqueda distribuida se hace bien.
       En las pruebas puedes comprobar/imprimir el rank de los que lo encuentran...
   **/
+
+  if(rank == root) {
+  	t1 = MPI_Wtime();
+  	printf("\nTiempo de ejecucion en rank %d = %1.3f ms\nFin Fase 2\n\n", rank, (t1-t0) * 1000);
+  }
 
 /***********************/
 /****    FASE 3     ****/
@@ -299,7 +341,8 @@ int main (int argc, char** argv)
 
 /** liberar memoria de variables dinamicas **/
   free(vectorElementos);
-  free(vectorBD);
+  free(vectorElementosEn);
+ // free(vectorBD);
   free(numElemnt);
   free(desp);
 
