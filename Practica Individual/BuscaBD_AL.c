@@ -15,9 +15,9 @@
     Se desarrollaran las tres fases de forma progresiva.
     Se presentaran los programas de las tres fases, con sus comprobaciones
     de que funcionan.
-    Se analizara si escala bien el tiempo del programa, variando el tamaño de la BD,
+    Se analizara si escala bien el tiempo del programa, variando el tamaÃ±o de la BD,
        los elementos de busqueda y el numero de procesadores:
-       1.- Lo tamaños de BD: 1.000, 100.000 y 10.000.000
+       1.- Lo tamaÃ±os de BD: 1.000, 100.000 y 10.000.000
        2.- Los elementos de busqueda: un 1, 2, 10, 20
        3.- Numero procesadores: 1,2,8,32,128
 
@@ -43,17 +43,17 @@ extern   Leer_datos (Elemento *v_Elementos, int n_Elementos,
 
 int main (int argc, char** argv)
 {
-  int i, j, k, rank, nprocs, sizeBD, elementS, root, pos, *vectorElementos, *numElemnt, *desp, bLength[4], stride, resto;
+  int i, j, k, rank, nprocs, sizeBD, elementS, root, pos, *vectorElementos, *numElemnt, *desp, bLength[4], stride, resto, messageSize, cont, despProbe;
   int tamBuf = 1024;
   char buf[tamBuf];
   double t0, t1;
   time_t t;
-  Elemento *vectorBD, *vectorBDAux, *vectorElementosEn;
+  Elemento *vectorBD, *vectorBDAux, *vectorElementosEn, *vectorElFinal;
   MPI_Aint offset[4];
   MPI_Datatype types[4], tipoStruct;
   MPI_Comm comm;
   MPI_Request req;
-  MPI_Status vstatus;
+  MPI_Status vstatus, statuProbe;
 
   MPI_Init(&argc, &argv);
 
@@ -117,11 +117,9 @@ int main (int argc, char** argv)
 
     MPI_Pack(&sizeBD, 1, MPI_INT, buf, tamBuf, &pos, comm);
     MPI_Pack(&elementS, 1, MPI_INT, buf, tamBuf, &pos, comm);
-    MPI_Ibcast (buf, tamBuf, MPI_PACKED, root, comm, &req);
-    MPI_Wait(&req, &vstatus); 
+    MPI_Bcast (buf, tamBuf, MPI_PACKED, root, comm);
   } else {
-    MPI_Ibcast (buf, tamBuf, MPI_PACKED, root, comm, &req);
-    MPI_Wait(&req, &vstatus);
+    MPI_Bcast (buf, tamBuf, MPI_PACKED, root, comm);
     MPI_Unpack (buf, tamBuf, &pos, &sizeBD, 1, MPI_INT, comm);
     MPI_Unpack (buf, tamBuf, &pos, &elementS, 1, MPI_INT, comm);
 
@@ -139,7 +137,7 @@ int main (int argc, char** argv)
 
   /**
         Comprobar que se ha repartido bien, el vector de busqueda.
-        Utiliza un numero de elementos a buscar pequeño para comprobar.
+        Utiliza un numero de elementos a buscar pequeÃ±o para comprobar.
 
   **/
 
@@ -170,10 +168,10 @@ int main (int argc, char** argv)
   	i++; 
   }
 
-  for(i = 0; i < nprocs; i++)
+  for(i = 1; i < nprocs; i++)
   	desp[i] = desp[i-1] + numElemnt[i-1]; 
 
-  /*if(rank == root) {
+  /*f(rank == root) {
 	  printf("Bloques\n");
 	  for(i = 0; i < nprocs; i++) 
 	  	printf("%d - ", numElemnt[i]);
@@ -197,7 +195,7 @@ int main (int argc, char** argv)
   **/
 
   //for(i = 0; i < numElemnt[rank]; i++)
-  	//printf("Soy %d tengo en la bd %s, %d, %f\n", rank, vectorBDAux[i].Producto, vectorBDAux[i].identificador, vectorBDAux[i].euros);
+  	//printf("Soy %d tengo en la bd %s: %d, %f\n", rank, vectorBDAux[i].Producto, vectorBDAux[i].identificador, vectorBDAux[i].euros);
 
   if(rank == root) {
   	t1 = MPI_Wtime();
@@ -231,7 +229,7 @@ int main (int argc, char** argv)
   */
 
   k = 0;
-  vectorElementosEn = malloc(sizeof(Elemento));
+  vectorElementosEn = malloc(sizeof(Elemento) * elementS);
   for(i = 0; i < elementS; i++)
   	for(j = 0; j < numElemnt[rank]; j++) {
   		if(vectorElementos[i] == vectorBDAux[j].identificador) {
@@ -240,13 +238,13 @@ int main (int argc, char** argv)
   			strcpy(vectorElementosEn[k].Producto, vectorBDAux[j].Producto);
   			//*&vectorElementosEn[k] = vectorBDAux[j];
   			k++;
-  			vectorElementosEn = (Elemento *) realloc(vectorElementosEn, (sizeof(Elemento) * (k + 1)));
+  			//vectorElementosEn = (Elemento *) realloc(vectorElementosEn, (sizeof(Elemento) * (k + 1)));
   			break;
   		}
 
   	}
 
-  printf("Vector de busqueda en %d\n", rank);
+  /*printf("Vector de busqueda en %d\n", rank);
   for(i = 0; i < elementS; i++)
   	printf("%d - ", vectorElementos[i]);
 
@@ -258,7 +256,7 @@ int main (int argc, char** argv)
 
   printf("\n\n");
 
- // int n = sizeof(vectorElementosEn) / sizeof(Elemento);
+ // int n = sizeof(vectorElementosEn) / sizeof(Elemento);*/
   printf("Identificadores encontrados en %d tamanio de vector es %d\n", rank, k);
   for(i = 0; i < k; i++)
   	printf("%d - ", vectorElementosEn[i].identificador);
@@ -266,19 +264,53 @@ int main (int argc, char** argv)
   printf("\n");
 
   /**
-     Todos los clones enviarán sus resultados al root.
-     Depende de la solución que encuentres, puede implicarte que el root necesite una estructura extra
+     Todos los clones enviarÃ¡n sus resultados al root.
+     Depende de la soluciÃ³n que encuentres, puede implicarte que el root necesite una estructura extra
       para recibir todas las estructuras resultados de los procesos.
       Se valorara el menor uso de memoria, y de transferencia de datos.
   **/
 
+  vectorElFinal = malloc(sizeof(Elemento) * elementS);
+  if(rank == root) {
+  	cont = 0;
+  	messageSize = 0;
+	despProbe = 0;
+	for(j = 0; j < k; j++) {
+		//printf("lacasito %d - Indice %d\n", vectorElementosEn[i].identificador, i);
+		*&vectorElFinal[j] = vectorElementosEn[j];
+	}
+	despProbe += k;
+  	for(j = 1; j < nprocs; j++) {
+	  	MPI_Probe(j, 0, comm, &statuProbe);
+	  	MPI_Get_count(&statuProbe, tipoStruct, &messageSize);
+	  	if(messageSize > 0) { 
+	  		cont++;
+	  		//if(messageSize == 1)
+	  			//messageSize++;
+	  		printf("Enviado por %d, DespProbe %d y MessageSize %d\n", j, despProbe, messageSize);
+	  		//MPI_Gatherv(vectorElementosEn, k, tipoStruct, vectorElFinal, &messageSize, desp, tipoStruct, root, comm);
+	  		MPI_Recv(&vectorElFinal[despProbe], messageSize, tipoStruct, j, 0, comm, &statuProbe);
+	  		despProbe += messageSize; 
+	  		//MPI_Wait(&req, &vstatus);
+	  	}
+	}
+  } else {
+  	MPI_Send(vectorElementosEn, k, tipoStruct, root, 0, comm);
+  	//MPI_Wait(&req, &vstatus);
+  }
+
   /**
-      Comprobar que la búsqueda distribuida se hace bien.
+      Comprobar que la bÃºsqueda distribuida se hace bien.
       En las pruebas puedes comprobar/imprimir el rank de los que lo encuentran...
   **/
 
+  MPI_Barrier(comm);
+
   if(rank == root) {
   	t1 = MPI_Wtime();
+  	for(i = 0; i < elementS; i++)
+  		printf("Soy %d tengo en la bd %s: %d, %f\n", rank, vectorElFinal[i].Producto, vectorElFinal[i].identificador, vectorElFinal[i].euros);
+  	
   	printf("\nTiempo de ejecucion en rank %d = %1.3f ms\nFin Fase 2\n\n", rank, (t1-t0) * 1000);
   }
 
@@ -297,7 +329,7 @@ int main (int argc, char** argv)
  /**
       Comprobar si se hace bien de forma distribuida.
       La media y desviacion te tienen que dar algo parecido a la media y
-      desviación con la que se ha inicializado el campo euros a partir
+      desviaciÃ³n con la que se ha inicializado el campo euros a partir
       de la distribucion gaussiana.
  **/
 
@@ -305,7 +337,7 @@ int main (int argc, char** argv)
 
  /**
       Sacar por pantalla una tipificacion de los elementos encontrados
-      a partir de la media y la desviación del campo euros de la BD
+      a partir de la media y la desviaciÃ³n del campo euros de la BD
  **/
 
  if (rank==root)
@@ -327,7 +359,7 @@ int main (int argc, char** argv)
        if (tipo <= -1.0) strcpy (texto,"16 por 100 mas rico");
        else
         if (tipo<0.0)strcpy (texto,"en el 50 por ciento mas rico");
-        else strcpy (texto,"en el 50 por ciento más pobre");
+        else strcpy (texto,"en el 50 por ciento mÃ¡s pobre");
 
        /***
         Sacar por pantalla
@@ -345,6 +377,7 @@ int main (int argc, char** argv)
  // free(vectorBD);
   free(numElemnt);
   free(desp);
+  free(vectorElFinal);
 
   if(rank == root)
   	printf("Fin del Programa\n");
