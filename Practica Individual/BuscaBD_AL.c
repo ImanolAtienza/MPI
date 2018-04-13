@@ -161,6 +161,7 @@ int main (int argc, char** argv)
   desp[0] = 0;
   numElemnt[0:nprocs] = stride;
 
+  // if(rank < resto) stride++;
 
   while(resto != 0) {
   	numElemnt[i] += 1;
@@ -229,14 +230,12 @@ int main (int argc, char** argv)
   */
 
   k = 0;
+  vectorElFinal = malloc(sizeof(Elemento) * elementS);
   vectorElementosEn = malloc(sizeof(Elemento) * elementS);
   for(i = 0; i < elementS; i++)
   	for(j = 0; j < numElemnt[rank]; j++) {
   		if(vectorElementos[i] == vectorBDAux[j].identificador) {
-  			vectorElementosEn[k].identificador = vectorBDAux[j].identificador;
-  			vectorElementosEn[k].euros = vectorBDAux[j].euros;
-  			strcpy(vectorElementosEn[k].Producto, vectorBDAux[j].Producto);
-  			//*&vectorElementosEn[k] = vectorBDAux[j];
+  			vectorElFinal[k] = vectorElementosEn[k] = vectorBDAux[j];
   			k++;
   			//vectorElementosEn = (Elemento *) realloc(vectorElementosEn, (sizeof(Elemento) * (k + 1)));
   			break;
@@ -247,21 +246,17 @@ int main (int argc, char** argv)
   /*printf("Vector de busqueda en %d\n", rank);
   for(i = 0; i < elementS; i++)
   	printf("%d - ", vectorElementos[i]);
-
   printf("\n");
-
   printf("vectorBDAux en %d\n", rank);
   for(i = 0; i < numElemnt[rank]; i++)
   	printf("%d - ", vectorBDAux[i].identificador);
-
   printf("\n\n");
-
- // int n = sizeof(vectorElementosEn) / sizeof(Elemento);*/
+  int n = sizeof(vectorElementosEn) / sizeof(Elemento);
   printf("Identificadores encontrados en %d tamanio de vector es %d\n", rank, k);
   for(i = 0; i < k; i++)
   	printf("%d - ", vectorElementosEn[i].identificador);
 
-  printf("\n");
+  printf("\n");*/
 
   /**
      Todos los clones enviarán sus resultados al root.
@@ -270,49 +265,42 @@ int main (int argc, char** argv)
       Se valorara el menor uso de memoria, y de transferencia de datos.
   **/
 
-  vectorElFinal = malloc(sizeof(Elemento) * elementS);
   if(rank == root) {
   	cont = 0;
   	messageSize = 0;
 	despProbe = 0;
-	for(j = 0; j < k; j++) {
-		//printf("lacasito %d - Indice %d\n", vectorElementosEn[i].identificador, i);
-		*&vectorElFinal[j] = vectorElementosEn[j];
-	}
 	despProbe += k;
   	for(j = 1; j < nprocs; j++) {
 	  	MPI_Probe(j, 0, comm, &statuProbe);
 	  	MPI_Get_count(&statuProbe, tipoStruct, &messageSize);
 	  	if(messageSize > 0) { 
 	  		cont++;
-	  		//if(messageSize == 1)
-	  			//messageSize++;
-	  		printf("Enviado por %d, DespProbe %d y MessageSize %d\n", j, despProbe, messageSize);
-	  		//MPI_Gatherv(vectorElementosEn, k, tipoStruct, vectorElFinal, &messageSize, desp, tipoStruct, root, comm);
 	  		MPI_Recv(&vectorElFinal[despProbe], messageSize, tipoStruct, j, 0, comm, &statuProbe);
 	  		despProbe += messageSize; 
-	  		//MPI_Wait(&req, &vstatus);
 	  	}
 	}
   } else {
   	MPI_Send(vectorElementosEn, k, tipoStruct, root, 0, comm);
-  	//MPI_Wait(&req, &vstatus);
-  }
+}
+
+  //MPI_Gather(&k, 1, MPI_INT, desp, nprocs, MPI_INT, root, comm);
+	//...
+  //MPI_Gatherv(vectorElementosEn, k, tipoStruct, vectorElFinal, &messageSize, desp, tipoStruct, root, comm);
 
   /**
       Comprobar que la búsqueda distribuida se hace bien.
       En las pruebas puedes comprobar/imprimir el rank de los que lo encuentran...
   **/
 
-  MPI_Barrier(comm);
-
   if(rank == root) {
   	t1 = MPI_Wtime();
-  	for(i = 0; i < elementS; i++)
-  		printf("Soy %d tengo en la bd %s: %d, %f\n", rank, vectorElFinal[i].Producto, vectorElFinal[i].identificador, vectorElFinal[i].euros);
+  	//for(i = 0; i < elementS; i++)
+  		//printf("Soy %d tengo en la bd %s: %d, %f\n", rank, vectorElFinal[i].Producto, vectorElFinal[i].identificador, vectorElFinal[i].euros);
   	
   	printf("\nTiempo de ejecucion en rank %d = %1.3f ms\nFin Fase 2\n\n", rank, (t1-t0) * 1000);
   }
+
+  MPI_Barrier(comm);
 
 /***********************/
 /****    FASE 3     ****/
