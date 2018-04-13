@@ -47,6 +47,7 @@ int main (int argc, char** argv)
   int tamBuf = 1024;
   char buf[tamBuf];
   double t0, t1;
+  long double media, mediaFinal, desviacion, desviacionFinal;
   time_t t;
   Elemento *vectorBD, *vectorBDAux, *vectorElementosEn, *vectorElFinal;
   MPI_Aint offset[4];
@@ -306,6 +307,8 @@ int main (int argc, char** argv)
 /****    FASE 3     ****/
 /***********************/
 
+ t0 = MPI_Wtime();
+
  /**
       CALCULAR LA MEDIA DEL CAMPO EUROS DE LA BD, DE FORMA DISTRIBUIDA.
       CALCULAR LA DESVIACION DEL CAMPO EUROS DE LA BD, DE FORMA DISTRIBUIDA.
@@ -313,6 +316,23 @@ int main (int argc, char** argv)
       Todos los clones tienen que tener la media y la desviacion.
  **/
 
+ media = mediaFinal = 0;
+ desviacion = desviacionFinal = 0;
+ for(i = 0; i < numElemnt[rank]; i++) 
+ 	media += vectorBDAux[i].euros;
+
+
+ //printf("Soy %d la suma es %LE\n", rank, media);
+
+ MPI_Allreduce(&media, &mediaFinal, 1, MPI_LONG_DOUBLE, MPI_SUM, comm);
+ mediaFinal /= sizeBD;
+
+for(i = 0; i < numElemnt[rank]; i++) 
+	desviacion += pow((vectorBDAux[i].euros - mediaFinal), 2);
+
+ desviacion /= sizeBD;
+ desviacion = sqrt(desviacion);
+ MPI_Allreduce(&desviacion, &desviacionFinal, 1, MPI_LONG_DOUBLE, MPI_SUM, comm);
 
  /**
       Comprobar si se hace bien de forma distribuida.
@@ -330,6 +350,8 @@ int main (int argc, char** argv)
 
  if (rank==root)
   {
+  	t1 = MPI_Wtime();
+  	printf("Soy %d la media final es %LE\nSoy %d la desviacion final es %LE\n", rank, mediaFinal, rank, desviacionFinal);
     /*for (...)
     {
        ...
@@ -355,14 +377,15 @@ int main (int argc, char** argv)
          2.- Su tipificacion en franjas de pobres y ricos
        ***/
     //}
+
+    printf("\nTiempo de ejecucion en rank %d = %1.3f ms\nFin Fase 2\n\n", rank, (t1-t0) * 1000);
   }
 
-
+  MPI_Barrier(comm);
 
 /** liberar memoria de variables dinamicas **/
   free(vectorElementos);
   free(vectorElementosEn);
- // free(vectorBD);
   free(numElemnt);
   free(desp);
   free(vectorElFinal);
