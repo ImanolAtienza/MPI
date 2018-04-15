@@ -47,7 +47,7 @@ int main (int argc, char** argv)
   int tamBuf = 1024;
   char buf[tamBuf];
   double t0, t1;
-  long double media, mediaFinal, desviacion, desviacionFinal;
+  long double media, mediaFinal, desviacion, desviacionFinal, tipo;
   time_t t;
   Elemento *vectorBD, *vectorBDAux, *vectorElementosEn, *vectorElFinal;
   MPI_Aint offset[4];
@@ -319,29 +319,17 @@ int main (int argc, char** argv)
  media = mediaFinal = 0;
  desviacion = desviacionFinal = 0;
  for(i = 0; i < numElemnt[rank]; i++) 
- 	media += vectorBDAux[i].euros;
-
-
- //printf("Soy %d la suma es %LE\n", rank, media);
+ 	media += (long double) vectorBDAux[i].euros;
 
  MPI_Allreduce(&media, &mediaFinal, 1, MPI_LONG_DOUBLE, MPI_SUM, comm);
- mediaFinal /= sizeBD;
+ mediaFinal /= (long double) sizeBD;
 
 for(i = 0; i < numElemnt[rank]; i++) 
-	desviacion += pow((vectorBDAux[i].euros - mediaFinal), 2);
+	desviacion += pow(((long double) vectorBDAux[i].euros - mediaFinal), 2);
 
- desviacion /= sizeBD;
- desviacion = sqrt(desviacion);
  MPI_Allreduce(&desviacion, &desviacionFinal, 1, MPI_LONG_DOUBLE, MPI_SUM, comm);
-
- /**
-      Comprobar si se hace bien de forma distribuida.
-      La media y desviacion te tienen que dar algo parecido a la media y
-      desviación con la que se ha inicializado el campo euros a partir
-      de la distribucion gaussiana.
- **/
-
-
+ desviacionFinal /= (long double) sizeBD;
+ desviacionFinal = sqrt(desviacionFinal);
 
  /**
       Sacar por pantalla una tipificacion de los elementos encontrados
@@ -351,34 +339,44 @@ for(i = 0; i < numElemnt[rank]; i++)
  if (rank==root)
   {
   	t1 = MPI_Wtime();
-  	printf("Soy %d la media final es %LE\nSoy %d la desviacion final es %LE\n", rank, mediaFinal, rank, desviacionFinal);
-    /*for (...)
+
+  	 /**
+      Comprobar si se hace bien de forma distribuida.
+      La media y desviacion te tienen que dar algo parecido a la media y
+      desviación con la que se ha inicializado el campo euros a partir
+      de la distribucion gaussiana.
+ **/
+
+  	//printf("Soy %d la media final es %Le\nSoy %d la desviacion final es %Le\n", rank, mediaFinal, rank, desviacionFinal);
+    for (i = 0; i < elementS; i++)
     {
-       ...
-       tipo = (media - euros_del_elemento_encontrado)/desviacion;
-       if (tipo >= 3.0) strcpy (texto," 1,5 por 1000 mas pobre");
+       tipo = (mediaFinal - vectorElFinal[i].euros) / desviacionFinal;
+       if (tipo >= 3.0) strcpy (buf," 1,5 por 1000 mas pobre");
        else
-       if (tipo >= 2.0) strcpy (texto," 2,25 por 100 mas pobre");
+       if (tipo >= 2.0) strcpy (buf," 2,25 por 100 mas pobre");
        else
-       if (tipo >= 1.0) strcpy (texto,"16 por 100 mas pobre");
+       if (tipo >= 1.0) strcpy (buf,"16 por 100 mas pobre");
        else
-       if (tipo <= -3.0) strcpy (texto,"1,5 por 1000 mas rico");
+       if (tipo <= -3.0) strcpy (buf,"1,5 por 1000 mas rico");
        else
-       if (tipo <= -2.0) strcpy (texto,"2,25 por 100 mas rico");
+       if (tipo <= -2.0) strcpy (buf,"2,25 por 100 mas rico");
        else
-       if (tipo <= -1.0) strcpy (texto,"16 por 100 mas rico");
+       if (tipo <= -1.0) strcpy (buf,"16 por 100 mas rico");
        else
-        if (tipo<0.0)strcpy (texto,"en el 50 por ciento mas rico");
-        else strcpy (texto,"en el 50 por ciento más pobre");
+        if (tipo<0.0)strcpy (buf,"en el 50 por ciento mas rico");
+        else strcpy (buf,"en el 50 por ciento más pobre");
 
        /***
         Sacar por pantalla
          1.- La informacion de cada elemento encontrado de la BD
          2.- Su tipificacion en franjas de pobres y ricos
        ***/
-    //}
 
-    printf("\nTiempo de ejecucion en rank %d = %1.3f ms\nFin Fase 2\n\n", rank, (t1-t0) * 1000);
+        printf ("Soy %d el identificador encontrado es %d\nSu producto es %s\nEn euros tiene %f\nSu tipificacion se encuentra entre %s.\n", rank, vectorElFinal[i].identificador, vectorElFinal[i].Producto, vectorElFinal[i].euros, buf);
+    }
+
+    printf("\nTiempo de ejecucion en rank %d = %1.3f ms\nFin Fase 3\n\n", rank, (t1-t0) * 1000);
+    printf("Fin del Programa\n");
   }
 
   MPI_Barrier(comm);
@@ -389,10 +387,6 @@ for(i = 0; i < numElemnt[rank]; i++)
   free(numElemnt);
   free(desp);
   free(vectorElFinal);
-
-  if(rank == root)
-  	printf("Fin del Programa\n");
-
   MPI_Finalize();
   return (0);
 } /*  main  */
