@@ -16,8 +16,8 @@ int main (int argc, char *argv[]) {
     #define N  1000
 
 	// Declarar variables primitivas
-	int root = 0, rank, nprocs, i = 1, j = 0, posF, posC, posFaux = 0, tamUser, tamItems, tamVistas;
-	float auxF, auxC;
+	int root = 0, rank, nprocs, i, j = 1, tamUser, tamItems, tamVistas, auxPosC = 0;
+	float posF, posC;
 	char buf[1024];
 	int *pR_I, *pR_J; // Si ha valorado algo, usuarios
 
@@ -36,52 +36,57 @@ int main (int argc, char *argv[]) {
 	if(rank == root) {
 		
 		if (file = fopen (argv[1], "r")) 
-			fscanf (file, "%d", &posF);    
-			while (!feof(file)) {	
+			fscanf (file, "%d", &tamUser);    
+			for(i = 0; i < 3; i++) {	
        			switch (i) {
-       				case 1:
+       				case 0:
        					// Obtener numeros de usuarios
-       					tamUser = j;
-       					printf("Numero de usuarios %d\n", posF);
-       					fscanf (file, "%d", &posF); 
-       					i++;
+       					printf("Numero de usuarios %d\n", tamUser);
+       					fscanf (file, "%d", &tamItems); 
        					break;
-       				case 2:
+       				case 1:
        					// Crear vector de items y obtener numero de items
-       					tamItems = j;
-       					pR_I = malloc(sizeof(int) * (posF + 1));
-       					printf("Numero de items %d\n", posF);
-       					fscanf (file, "%d", &posF); 
-       					i++;
+       					pR_I = malloc(sizeof(int) * (tamItems + 1));
+       					printf("Numero de items %d\n", tamItems);
+       					fscanf (file, "%d", &tamVistas); 
        					break;
-   					case 3:
+   					case 2:
    						// Crear vector de usuarios con respecto a items vistos/comprados
-   						tamVistas = j;
-   						pR_J = malloc(sizeof(int) * posF);
+   						pR_J = malloc(sizeof(int) * tamVistas);
    						printf("Numero de items vistos %d\n", tamVistas);
-   						fscanf (file, "%f %f", &auxF, &auxC); 
-   						printf("Numero de items vistos %f, %f\n", auxF, auxC);
-   						i++;
-   						break;
-   					case 4:
-   						// Rellenar vectores
-   						/*if(posC != posFaux) {
-   							posFaux = pR_I[j] = (posC - 1);
-   							j++;
-   						}*/
-   						//pR_J[posC] = 1;
-   						
-   						fscanf (file, "%d %d", &auxF, &auxC); 
-   						printf("Numero de items vistos %f, %f\n", auxF, auxC);
    						break;
        			}
 			}
-			printf("\n\n");
-			fclose (file);        
+
+			pR_I[0] = 0;
+			for(i = 0; i < tamVistas; i++) {
+				fscanf (file, "%f %f", &posF, &posC); 
+				pR_J[i] = (int) (posF - 1);
+				if(((int) (posC - 1)) != auxPosC) {
+					printf("El oro del peru %d, %d\n", pR_I[j - 1], i);
+					auxPosC = (int) (posC - 1);
+					pR_I[j] = i;
+					j++;
+				}
+				printf("Contenido en pR_J %d\n", pR_J[i]);
+			}
+
+			fclose (file); 
+			pR_I[tamItems] = tamVistas;
+			printf("\n"); 
+
+			for(i = 0; i < (tamItems + 1); i++)
+				printf("Contenido en pR_I %d\n", pR_I[i]); 
+
+			printf("\n\n");     
 	}
 
 
     MPI_Finalize();
+
+    free(pR_J);
+    free(pR_I);
+
     return (0);
 }
 
