@@ -75,6 +75,8 @@ int main (int argc, char *argv[]) {
    						printf("Numero de items vistos %f, %f\n", auxF, auxC);
    						break;
        			}
+       			if(i == 4)
+       				break;
 			}
 			printf("\n\n");
 			fclose (file);        
