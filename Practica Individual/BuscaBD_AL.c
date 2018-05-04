@@ -325,11 +325,11 @@ int main (int argc, char** argv)
  mediaFinal /= (long double) sizeBD;
 
 for(i = 0; i < numElemnt[rank]; i++) 
-	desviacion += pow(((long double) vectorBDAux[i].euros - mediaFinal), 2);
+	desviacion += powl(((long double) vectorBDAux[i].euros - mediaFinal), 2);
 
  MPI_Allreduce(&desviacion, &desviacionFinal, 1, MPI_LONG_DOUBLE, MPI_SUM, comm);
  desviacionFinal /= (long double) sizeBD;
- desviacionFinal = sqrt(desviacionFinal);
+ desviacionFinal = sqrtl(desviacionFinal);
 
  /**
       Sacar por pantalla una tipificacion de los elementos encontrados

@@ -1,8 +1,13 @@
 /*************************************************************
-	PPrincipal.c
+	Introduccion_v3BCMan_RE
 ************************************************************/
 
-#include "Rutinas.c"
+#include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+
 /*  s (int vec[CONSTANTE])
     s ( int *vec)
 */
@@ -15,38 +20,39 @@ int main (int argc, char *argv[]) {
     #define N  1000
 
 	// Declarar variables primitivas
-	int root = 0, rank, nprocs, i, j = 1, tamUser, tamItems, tamVistas, tamJ, auxPosC = 0, pos;
+	int root = 0, rank, nprocs, i, j = 1, l,n,k, tamUser, tamItems, tamVistas, tamJ, auxPosC = 0, pos;
 	float posF, posC;
 	char buf[1024];
 	int *pR_I, *pR_J, *auxpR_I, *auxpR_J; // Si ha valorado algo, usuarios
+	long double suma, *aux2norma, *prod_interno;
+	int userI, userJ;
 	
 	int Nloc, cuantos, stride, resto;
 	int *sendcounts_I, *displ_I, *sendcounts_J, *displ_J;
-
-	double t0, t1;
+	
+	MPI_Status status;
 
 	// Declarar otro tipo variables
 	FILE *file;
 
 	// Declarar variables MPI
     MPI_Comm comm = MPI_COMM_WORLD;
-    MPI_Request req;
-  	MPI_Status vstatus;
 
     MPI_Init (&argc, &argv);
 	 
 	MPI_Comm_rank (comm, &rank);
 	MPI_Comm_size (comm, &nprocs);
-
+	
 	sendcounts_I = malloc(nprocs*sizeof(int));
 	displ_I = malloc(nprocs*sizeof(int));
 	
-	if(rank == root) {
+	if (rank == root){
 		sendcounts_J = malloc(nprocs*sizeof(int));
 		displ_J = malloc(nprocs*sizeof(int));
-
-		t0 = MPI_Wtime();
-
+	}
+	
+	if(rank == root) {
+		
 		if (file = fopen (argv[1], "r")) 
 			fscanf (file, "%d", &tamUser);    
 			for(i = 0; i < 3; i++) {	
@@ -69,6 +75,8 @@ int main (int argc, char *argv[]) {
    						break;
        			}
 			}
+			
+			printf("\n\n");
 
 			pR_I[0] = 0;
 			for(i = 0; i < tamVistas; i++) {
@@ -81,6 +89,8 @@ int main (int argc, char *argv[]) {
 				}
 				printf("Contenido en pR_J %d\n", pR_J[i]);
 			}
+			
+			printf("\n\n");
 
 			fclose (file); 
 			pR_I[tamItems] = tamVistas;
@@ -90,16 +100,15 @@ int main (int argc, char *argv[]) {
 				printf("Contenido en pR_I %d\n", pR_I[i]); 
 
 			printf("\n\n"); 
-
+			
 			pos = 0;
 			MPI_Pack (&tamUser, 1, MPI_INT, buf, sizeof(buf), &pos, comm);
 			MPI_Pack (&tamItems, 1, MPI_INT, buf, sizeof(buf), &pos, comm);
-			MPI_Pack (&tamVistas, 1, MPI_INT, buf, sizeof(buf), &pos, comm);    
+			MPI_Pack (&tamVistas, 1, MPI_INT, buf, sizeof(buf), &pos, comm);
+				
 	}
-
 	pos = 0;
-	// MPI_Bcast (buf, sizeof(buf), MPI_PACKED, root, comm);
-	MPI_Ibcast (buf, sizeof(buf), MPI_PACKED, root, comm, &req);
+	MPI_Bcast (buf, sizeof(buf), MPI_PACKED, root, comm);
 	MPI_Unpack (buf, sizeof(buf), &pos, &tamUser, 1, MPI_INT, comm);
 	MPI_Unpack (buf, sizeof(buf), &pos, &tamItems, 1, MPI_INT, comm);
 	MPI_Unpack (buf, sizeof(buf), &pos, &tamVistas, 1, MPI_INT, comm);
@@ -110,21 +119,18 @@ int main (int argc, char *argv[]) {
 	for (i=0; i<=nprocs-1; i++){
 		if (((tamItems-cuantos)%(nprocs-i))==0)
 			Nloc = (tamItems-cuantos)/(nprocs-i);
-
-		displ_I[i] = cuantos; 
-		sendcounts_I[i] = Nloc; 
-		cuantos += Nloc;
+		displ_I[i] = cuantos; sendcounts_I[i] = Nloc; cuantos += Nloc;
 //		if (rank == root)
 //			printf(" rank %d ->   displ_I: %d	  sendcounts_I: %d\n", i, displ_I[i], sendcounts_I[i]);
 	}
 	
 	printf("Soy %d, sendcounts_I %d, displ_I %d\n", rank, sendcounts_I[rank], displ_I[rank]);
 	auxpR_I = malloc((sendcounts_I[rank]+1)*sizeof(int));	
-	MPI_Wait(&req, &vstatus);
+	aux2norma = malloc(sendcounts_I[rank]*sizeof(long double));
 	MPI_Scatterv(pR_I, sendcounts_I, displ_I, MPI_INT, auxpR_I, 
-						sendcounts_I[rank], MPI_INT, root, comm);
+						sendcounts_I[rank], MPI_INT, root, comm);	
 	
-	
+	MPI_Barrier (comm);
 	
 	// Reparto de pR_J, solo lo hace el root porque los demas procesos no conocen pR_I
 	if (rank == root){
@@ -137,32 +143,69 @@ int main (int argc, char *argv[]) {
 	}
 		
 	MPI_Scatter(sendcounts_J, 1, MPI_INT, &tamJ, 1, MPI_INT, root, comm);
-	auxpR_I[sendcounts_I[rank]] = tamJ;	
 	printf("Soy %d, tamJ %d\n", rank, tamJ);
+	auxpR_I[sendcounts_I[rank]] = tamJ;
 	
-	auxpR_J = malloc(tamJ * sizeof(int));
+	auxpR_J = malloc(tamJ*sizeof(int));
 	MPI_Scatterv(pR_J, sendcounts_J, displ_J, MPI_INT, auxpR_J, 
 						tamJ, MPI_INT, root, comm);
- 
-	if (rank == root){
-		free (pR_J); 
-		free (pR_I);
-		free (displ_J); 
-		free (sendcounts_J);
-
-		t1 = MPI_Wtime();
-		printf("\nTiempo de ejecucion en rank %d = %1.3f ms\nFin Fase 1\n\n", rank, (t1-t0) * 1000);
+	
+	// Calculo 2norma
+	n = 0;
+	for (i=0; i<=sendcounts_I[rank]-1; i++){
+		suma = 0;
+		for (j=n; j<= auxpR_I[i+1]-1; j++){
+			suma += (long double) 1;
+			n++;
+		}
+						
+		aux2norma[i] = sqrtl(suma);
+		printf("soy %d -> item %d -> 2norma: %Le\n",rank, i, aux2norma[i]);
 	}
-
-	MPI_Barrier (comm);
-    // 
-
+	
+	if (sendcounts_I[rank]>1){
+		prod_interno = malloc((sendcounts_I[rank]-1)*sizeof(long double));
+		// recorrer tablas -> i=tabla
+		for (i=0; i<=sendcounts_I[rank]-1; i++){
+			prod_interno[0:sendcounts_I[rank]-1] = 0;
+			// recorrer items para cada tabla -> j=item
+			for (j=0; j<=sendcounts_I[rank]-1; j++){
+				suma = 0;
+				if (i==j)
+					continue;
+				// recorrer usuarios para prod interno -> n=usuario de tabla correspondientea item i
+				for (n=0; n<=auxpR_I[i+1]-auxpR_I[i]-1; n++){
+					userI = auxpR_J[auxpR_I[i]+n];
+					printf("userI = %d\n", userI);
+					// recorrer usuarios para prod interno -> k=usuario de item j
+					for (k=0; k<=auxpR_I[j+1]-auxpR_I[j]-1; k++){
+						userJ = auxpR_J[auxpR_I[j]+k];
+						printf("userJ = %d\n", userJ);
+						if (userI==userJ){
+							printf("entra\n");
+							suma += 1;
+						}
+					}
+				}
+				printf("suma %Le\n",suma);
+				prod_interno[j] = suma;
+				printf("prod item %d con item %d -> %Le\n", i, j, prod_interno[j]);
+			}
+		}
+	}
+	
+	
+	
+	if (rank == root){
+		free (pR_J); free (pR_I);
+		free (displ_J); free (sendcounts_J);
+	}
 	free (displ_I);
     free (sendcounts_I);
 	free (auxpR_I);
 	free (auxpR_J);
 
     MPI_Finalize();
-
-    return (0);
+	return (0);
 }
+
