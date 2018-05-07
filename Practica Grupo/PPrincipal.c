@@ -20,7 +20,7 @@ int main (int argc, char *argv[]) {
     #define N  1000
 
 	// Declarar variables primitivas
-	int root = 0, rank, nprocs, i, j = 1, l,n,k, tamUser, tamItems, tamVistas, tamJ, auxPosC = 0, pos;
+	int root = 0, rank, nprocs, i, j = 1, l,n,k, tamUser, tamItems, tamVistas, tamJ, auxPosC = 0, pos, origen = 0, pos1 = 0, pos2 = 0;
 	float posF, posC;
 	char buf[1024];
 	int *pR_I, *pR_J, *auxpR_I, *auxpR_J; // Si ha valorado algo, usuarios
@@ -28,15 +28,15 @@ int main (int argc, char *argv[]) {
 	int userI, userJ;
 	
 	int Nloc, cuantos, stride, resto;
-	int *sendcounts_I, *displ_I, *sendcounts_J, *displ_J;
-	
-	MPI_Status status;
+	int *sendcounts_I, *displ_I, *sendcounts_J, *displ_J, *auxitem;
 
 	// Declarar otro tipo variables
 	FILE *file;
 
 	// Declarar variables MPI
     MPI_Comm comm = MPI_COMM_WORLD;
+    MPI_Status status;
+	//MPI_Request req;
 
     MPI_Init (&argc, &argv);
 	 
@@ -125,15 +125,15 @@ int main (int argc, char *argv[]) {
 	}
 	
 	printf("Soy %d, sendcounts_I %d, displ_I %d\n", rank, sendcounts_I[rank], displ_I[rank]);
-	auxpR_I = malloc((sendcounts_I[rank]+1)*sizeof(int));	
-	aux2norma = malloc(sendcounts_I[rank]*sizeof(long double));
+	auxpR_I = malloc((sendcounts_I[rank] + 1) * sizeof(int));	
+	aux2norma = malloc(sendcounts_I[rank] * sizeof(long double));
 	MPI_Scatterv(pR_I, sendcounts_I, displ_I, MPI_INT, auxpR_I, 
 						sendcounts_I[rank], MPI_INT, root, comm);	
 	
 	MPI_Barrier (comm);
 	
 	// Reparto de pR_J, solo lo hace el root porque los demas procesos no conocen pR_I
-	if (rank == root){
+	if (rank == root) {
 		for (i=0; i<=nprocs-1; i++){
 			sendcounts_J[i] = pR_I[sendcounts_I[i]+displ_I[i]]-pR_I[displ_I[i]]; 
 			displ_J[i] = pR_I[displ_I[i]];
@@ -160,9 +160,53 @@ int main (int argc, char *argv[]) {
 		}
 						
 		aux2norma[i] = sqrtl(suma);
-		printf("soy %d -> item %d -> 2norma: %Le\n",rank, i, aux2norma[i]);
+		//printf("soy %d -> item %d -> 2norma: %Le\n",rank, i, aux2norma[i]);
 	}
-	
+
+	auxitem = malloc(sizeof(int) * tamItems);
+	i = j = k = 0;
+	while (i <= nprocs - 1) {
+		if (rank == i) {
+			if (auxpR_I[j + 1] < auxpR_I[j]) {
+				pos1 = auxpR_I[j];
+				pos2 = auxpR_I[j + 1] - 1;
+				printf("Soy %d , ha entrado %d, j = %d y voy a enviar %d - %d = %d datos\n", rank, i, j, pos1, pos2, pos1 - pos2);
+			} else {
+				pos2 = auxpR_I[j];
+				pos1 = auxpR_I[j + 1];
+				printf("Soy %d , ha entrado %d, j = %d y voy a enviar %d - %d = %d datos\n", rank, i, j, pos1, pos2, pos1 - pos2);
+			}
+			
+			//MPI_Bcast(&auxpR_J[j], auxpR_I[j + 1] - auxpR_I[j], MPI_INT, i, comm);
+			for(n = 0; n <= nprocs-1; n++) {
+				if(n != rank)
+					MPI_Send(&auxpR_J[j], pos1 - pos2, MPI_INT, n, 0, comm);
+			}
+
+			j++;
+			if (sendcounts_I[rank] == j) {
+				i++;
+				j = 0;
+				printf("Holaaa soy %d y esto aqui con sendcounts %d, i = %d y j = %d\n", rank, sendcounts_I[rank], i, j);
+			}
+		} else {
+			//MPI_Bcast(auxitem, tamItems, MPI_INT, i, comm);
+			printf("soy %d y estoy esperando a recibir de %d\n", rank, i);
+			MPI_Recv(auxitem, tamItems, MPI_INT, i, 0, comm, &status);
+			printf("soy %d me ha llegado el item %d y tiene %d, %d, %d\n", rank, j, auxitem[0], auxitem[1], auxitem[2]);
+			j++;
+			if (sendcounts_I[i] == j) {
+				i++;
+				j = 0;
+				//printf("Holaaa soy %d y esto aqui con sendcounts %d, i %d y j %d\n", rank, sendcounts_I[rank], i, j);
+			}
+		}
+	}
+
+	/*for(i = 0; i <= sendcounts_I[rank] - 1; i++) {
+		MPI_Bcast (&auxpR_J[tamJ - auxpR_I[i]], auxpR_I[i+1] - auxpR_I[i], MPI_INT, rank, comm);
+	}
+
 	if (sendcounts_I[rank]>1){
 		prod_interno = malloc((sendcounts_I[rank]-1)*sizeof(long double));
 		// recorrer tablas -> i=tabla
@@ -192,14 +236,13 @@ int main (int argc, char *argv[]) {
 				printf("prod item %d con item %d -> %Le\n", i, j, prod_interno[j]);
 			}
 		}
-	}
+	}*/
 	
-	
-	
-	if (rank == root){
+	if(rank == root) {
 		free (pR_J); free (pR_I);
 		free (displ_J); free (sendcounts_J);
 	}
+
 	free (displ_I);
     free (sendcounts_I);
 	free (auxpR_I);

@@ -269,8 +269,8 @@ int main (int argc, char** argv)
   if(rank == root) {
   	cont = 0;
   	messageSize = 0;
-	despProbe = 0;
-	despProbe += k;
+	  despProbe = 0;
+	  despProbe += k;
   	for(j = 1; j < nprocs; j++) {
 	  	MPI_Probe(j, 0, comm, &statuProbe);
 	  	MPI_Get_count(&statuProbe, tipoStruct, &messageSize);
