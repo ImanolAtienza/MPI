@@ -20,7 +20,7 @@ int main (int argc, char *argv[]) {
     #define N  1000
 
 	// Declarar variables primitivas
-	int root = 0, rank, nprocs, i, j = 1, l,n,k, tamUser, tamItems, tamVistas, tamJ, auxPosC = 0, pos, origen = 0, pos1 = 0, pos2 = 0;
+	int root = 0, rank, nprocs, i, j = 1, l,n,k, tamUser, tamItems, tamVistas, tamJ, auxPosC = 0, pos, origen = 0, messagesize;
 	float posF, posC;
 	char buf[1024];
 	int *pR_I, *pR_J, *auxpR_I, *auxpR_J; // Si ha valorado algo, usuarios
@@ -163,79 +163,52 @@ int main (int argc, char *argv[]) {
 		//printf("soy %d -> item %d -> 2norma: %Le\n",rank, i, aux2norma[i]);
 	}
 
-	auxitem = malloc(sizeof(int) * tamItems);
-	i = j = k = 0;
+	j = i = 0;
 	while (i <= nprocs - 1) {
 		if (rank == i) {
-			if (auxpR_I[j + 1] < auxpR_I[j]) {
-				pos1 = auxpR_I[j];
-				pos2 = auxpR_I[j + 1] - 1;
-				printf("Soy %d , ha entrado %d, j = %d y voy a enviar %d - %d = %d datos\n", rank, i, j, pos1, pos2, pos1 - pos2);
-			} else {
-				pos2 = auxpR_I[j];
-				pos1 = auxpR_I[j + 1];
-				printf("Soy %d , ha entrado %d, j = %d y voy a enviar %d - %d = %d datos\n", rank, i, j, pos1, pos2, pos1 - pos2);
+			k = 0;
+			for (j=0; j<=sendcounts_I[i]-1; j++){
+				//printf("rank %d entra en el for\n", rank);
+				if (sendcounts_I[i]==1){
+					pos = k;
+					k += auxpR_I[j + 1];
+				} else if ((sendcounts_I[i]>1)&&(j==sendcounts_I[i]-1)) {
+					//printf("rank %d entra en else if raro teniendo auxpR_I[j] = %d y auxpR_I[j+1] = %d\n", rank, auxpR_I[j], auxpR_I[j+1]);
+					pos = k;
+					k += auxpR_I[j + 1] - k;
+				} else if ((sendcounts_I[i]>1)&&(j!=sendcounts_I[i]-1)) {
+					pos = k;
+					k += auxpR_I[j + 1] - auxpR_I[j];
+				}
+				//printf("Soy %d, tengo %d sendcounts, estoy en el item %d cuya pos1 = %d y tam %d\n", rank, sendcounts_I[rank], j, pos1, k-pos1);
+				for(n = 0; n <= nprocs-1; n++) {
+					if(n != rank)
+						MPI_Send(&auxpR_J[pos], k - pos, MPI_INT, n, 0, comm);
+				}
 			}
-			
-			//MPI_Bcast(&auxpR_J[j], auxpR_I[j + 1] - auxpR_I[j], MPI_INT, i, comm);
-			for(n = 0; n <= nprocs-1; n++) {
-				if(n != rank)
-					MPI_Send(&auxpR_J[j], pos1 - pos2, MPI_INT, n, 0, comm);
-			}
-
-			j++;
-			if (sendcounts_I[rank] == j) {
-				i++;
-				j = 0;
-				printf("Holaaa soy %d y esto aqui con sendcounts %d, i = %d y j = %d\n", rank, sendcounts_I[rank], i, j);
-			}
+			i++;
 		} else {
 			//MPI_Bcast(auxitem, tamItems, MPI_INT, i, comm);
-			printf("soy %d y estoy esperando a recibir de %d\n", rank, i);
-			MPI_Recv(auxitem, tamItems, MPI_INT, i, 0, comm, &status);
-			printf("soy %d me ha llegado el item %d y tiene %d, %d, %d\n", rank, j, auxitem[0], auxitem[1], auxitem[2]);
+			//printf("soy %d y estoy esperando a recibir de %d\n", rank, i);
+			MPI_Probe(i, 0, comm, &status);
+	  		MPI_Get_count(&status, MPI_INT, &messagesize);
+	  		auxitem = malloc(sizeof(int) * messagesize);
+			MPI_Recv(auxitem, messagesize, MPI_INT, i, 0, comm, &status);
+			printf("soy %d me ha llegado el item %d y tiene ", rank, j);
+			for(k = 0; k < messagesize; k++)
+				printf("%d ", auxitem[k]);
+			printf("\n\n");
 			j++;
 			if (sendcounts_I[i] == j) {
 				i++;
 				j = 0;
-				//printf("Holaaa soy %d y esto aqui con sendcounts %d, i %d y j %d\n", rank, sendcounts_I[rank], i, j);
-			}
+			}	
 		}
+		printf("soy %d y voy por la ite %d\n", rank, i);
 	}
 
 	/*for(i = 0; i <= sendcounts_I[rank] - 1; i++) {
 		MPI_Bcast (&auxpR_J[tamJ - auxpR_I[i]], auxpR_I[i+1] - auxpR_I[i], MPI_INT, rank, comm);
-	}
-
-	if (sendcounts_I[rank]>1){
-		prod_interno = malloc((sendcounts_I[rank]-1)*sizeof(long double));
-		// recorrer tablas -> i=tabla
-		for (i=0; i<=sendcounts_I[rank]-1; i++){
-			prod_interno[0:sendcounts_I[rank]-1] = 0;
-			// recorrer items para cada tabla -> j=item
-			for (j=0; j<=sendcounts_I[rank]-1; j++){
-				suma = 0;
-				if (i==j)
-					continue;
-				// recorrer usuarios para prod interno -> n=usuario de tabla correspondientea item i
-				for (n=0; n<=auxpR_I[i+1]-auxpR_I[i]-1; n++){
-					userI = auxpR_J[auxpR_I[i]+n];
-					printf("userI = %d\n", userI);
-					// recorrer usuarios para prod interno -> k=usuario de item j
-					for (k=0; k<=auxpR_I[j+1]-auxpR_I[j]-1; k++){
-						userJ = auxpR_J[auxpR_I[j]+k];
-						printf("userJ = %d\n", userJ);
-						if (userI==userJ){
-							printf("entra\n");
-							suma += 1;
-						}
-					}
-				}
-				printf("suma %Le\n",suma);
-				prod_interno[j] = suma;
-				printf("prod item %d con item %d -> %Le\n", i, j, prod_interno[j]);
-			}
-		}
 	}*/
 	
 	if(rank == root) {
