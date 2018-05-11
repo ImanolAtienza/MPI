@@ -1,58 +1,44 @@
 /*************************************************************
-	Introduccion_v3BCMan_RE
+	PPrincipal - Busqueda Binaria
 ************************************************************/
 
-#include <mpi.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <string.h>
-
-/*  s (int vec[CONSTANTE])
-    s ( int *vec)
-*/
-
-// Forma en C de decirle que vas a usar una funcion externa que no esta en el fichero o modulo
-extern void PracticaBinaria (MPI_Comm comm, int n, int vec[n], int root);
+#include "defines.h"
 
 int main (int argc, char *argv[]) {
-	// En c las constantes se definen con define
-    #define N  1000
-
-	// Declarar variables primitivas
-	int root = 0, rank, nprocs, i, j = 1, l,n,k, tamUser, tamItems, tamVistas, tamJ, auxPosC = 0, pos, origen = 0, messagesize;
-	float posF, posC;
-	char buf[1024];
-	int *pR_I, *pR_J, *auxpR_I, *auxpR_J; // Si ha valorado algo, usuarios
-	long double suma, *aux2norma, *prod_interno;
+	// Declaracion de variables primitivas de la aplicacion
+	int root = 0, rank, nprocs, i, j = 1, jj, w , n, k, tamUser, tamItems, tamVistas, tamJ, auxPosC = 0, pos, messagesize, tam, Nloc, cuantos, stride, resto;
 	int userI, userJ;
-	
-	int Nloc, cuantos, stride, resto;
-	int *sendcounts_I, *displ_I, *sendcounts_J, *displ_J, *auxitem;
+	int *sendcounts_I, *displ_I, *sendcounts_J, *displ_J, *auxitem, *pR_I, *pR_J, *auxpR_I, *auxpR_J; // Si ha valorado algo, usuarios
+
+	float posF, posC;
+
+	double *angulo;
+	long double suma, *aux2norma, *prod_interno, *prod2N, auxnorma, *arcocoseno;
+
+	char buf[N];
 
 	// Declarar otro tipo variables
 	FILE *file;
 
 	// Declarar variables MPI
-    MPI_Comm comm = MPI_COMM_WORLD;
-    MPI_Status status;
-	//MPI_Request req;
+	MPI_Comm comm = MPI_COMM_WORLD;
+	MPI_Status status;
 
-    MPI_Init (&argc, &argv);
+	// Inicio de programa MPI
+    MPI_Init(&argc, &argv);
 	 
-	MPI_Comm_rank (comm, &rank);
-	MPI_Comm_size (comm, &nprocs);
+	// Obtencion de identificador del clon, clones en el grupo general e inicializacion de vector de reparto, desplazamiento y, para el root,
+	// vector de reparto y deslplazamiento del vector J
+	MPI_Comm_rank(comm, &rank);
+	MPI_Comm_size(comm, &nprocs);
 	
-	sendcounts_I = malloc(nprocs*sizeof(int));
-	displ_I = malloc(nprocs*sizeof(int));
+	sendcounts_I = malloc(nprocs * sizeof(int));
+	displ_I = malloc(nprocs * sizeof(int));
 	
 	if (rank == root){
 		sendcounts_J = malloc(nprocs*sizeof(int));
 		displ_J = malloc(nprocs*sizeof(int));
-	}
-	
-	if(rank == root) {
-		
+
 		if (file = fopen (argv[1], "r")) 
 			fscanf (file, "%d", &tamUser);    
 			for(i = 0; i < 3; i++) {	
@@ -124,13 +110,13 @@ int main (int argc, char *argv[]) {
 //			printf(" rank %d ->   displ_I: %d	  sendcounts_I: %d\n", i, displ_I[i], sendcounts_I[i]);
 	}
 	
-	printf("Soy %d, sendcounts_I %d, displ_I %d\n", rank, sendcounts_I[rank], displ_I[rank]);
+//	printf("Soy %d, sendcounts_I %d, displ_I %d\n", rank, sendcounts_I[rank], displ_I[rank]);
 	auxpR_I = malloc((sendcounts_I[rank] + 1) * sizeof(int));	
 	aux2norma = malloc(sendcounts_I[rank] * sizeof(long double));
 	MPI_Scatterv(pR_I, sendcounts_I, displ_I, MPI_INT, auxpR_I, 
 						sendcounts_I[rank], MPI_INT, root, comm);	
 	
-	MPI_Barrier (comm);
+//	MPI_Barrier (comm);
 	
 	// Reparto de pR_J, solo lo hace el root porque los demas procesos no conocen pR_I
 	if (rank == root) {
@@ -141,7 +127,7 @@ int main (int argc, char *argv[]) {
 //				printf(" rank %d ->   displ_J: %d	  sendcounts_J: %d\n", i, displ_J[i], sendcounts_J[i]);
 		}	
 	}
-		
+	
 	MPI_Scatter(sendcounts_J, 1, MPI_INT, &tamJ, 1, MPI_INT, root, comm);
 	printf("Soy %d, tamJ %d\n", rank, tamJ);
 	auxpR_I[sendcounts_I[rank]] = tamJ;
@@ -157,59 +143,115 @@ int main (int argc, char *argv[]) {
 		for (j=n; j<= auxpR_I[i+1]-1; j++){
 			suma += (long double) 1;
 			n++;
-		}
-						
+		}				
 		aux2norma[i] = sqrtl(suma);
-		//printf("soy %d -> item %d -> 2norma: %Le\n",rank, i, aux2norma[i]);
 	}
 
+	// Calculo prod_interno
+	prod_interno = malloc((sendcounts_I[rank]*(tamItems-1))*sizeof(long double));
+	prod2N = malloc ((sendcounts_I[rank]*(tamItems-1))*sizeof(long double));
+	angulo = malloc ((sendcounts_I[rank]*(tamItems-1))*sizeof(long double));
+	arcocoseno = malloc ((sendcounts_I[rank]*(tamItems-1))*sizeof(long double));
+	prod_interno[0:(sendcounts_I[rank]*(tamItems-1))-1] = (long double) 0;
 	j = i = 0;
+	w = 0;
 	while (i <= nprocs - 1) {
+		cuantos = 0;
 		if (rank == i) {
-			k = 0;
 			for (j=0; j<=sendcounts_I[i]-1; j++){
-				//printf("rank %d entra en el for\n", rank);
-				if (sendcounts_I[i]==1){
-					pos = k;
-					k += auxpR_I[j + 1];
-				} else if ((sendcounts_I[i]>1)&&(j==sendcounts_I[i]-1)) {
-					//printf("rank %d entra en else if raro teniendo auxpR_I[j] = %d y auxpR_I[j+1] = %d\n", rank, auxpR_I[j], auxpR_I[j+1]);
-					pos = k;
-					k += auxpR_I[j + 1] - k;
-				} else if ((sendcounts_I[i]>1)&&(j!=sendcounts_I[i]-1)) {
-					pos = k;
-					k += auxpR_I[j + 1] - auxpR_I[j];
+				//printf ("soy %d -> aux2norma[%d] = %Le\n", rank,j, aux2norma[j]);
+				auxnorma = aux2norma[j];
+				MPI_Bcast (&auxnorma, 1, MPI_LONG_DOUBLE, i, comm);				
+				if (j==sendcounts_I[i]-1) {
+					pos = cuantos;
+					cuantos += auxpR_I[j + 1] - cuantos;
+				} else {
+					pos = cuantos;
+					cuantos += auxpR_I[j + 1] - auxpR_I[j];
 				}
-				//printf("Soy %d, tengo %d sendcounts, estoy en el item %d cuya pos1 = %d y tam %d\n", rank, sendcounts_I[rank], j, pos1, k-pos1);
-				for(n = 0; n <= nprocs-1; n++) {
+				for(n = 0; n <= nprocs-1; n++) 
 					if(n != rank)
-						MPI_Send(&auxpR_J[pos], k - pos, MPI_INT, n, 0, comm);
-				}
+						MPI_Send(&auxpR_J[pos], cuantos - pos, MPI_INT, n, 1, comm);
+				printf("auxpR_I[%d] = %d ; auxpR_I[%d] = %d\n",j+1, auxpR_I[j+1],j, auxpR_I[j]);
+				printf("auxpR_I[%d] = %d ; auxpR_I[%d] = %d\n",jj+1, auxpR_I[jj+1],jj, auxpR_I[jj]);
+				for (jj=0; jj<=sendcounts_I[rank]-1; jj++){
+					suma = 0;
+					if (j==jj)
+						continue;
+					prod2N[w] = aux2norma[j]*aux2norma[jj];
+					if (jj==sendcounts_I[rank]-1)
+					tam = auxpR_I[jj+1]-cuantos;
+					else {
+						tam = auxpR_I[jj+1]-auxpR_I[jj];
+						cuantos += tam;
+					}
+					for (n=0; n<=auxpR_I[jj+1]-auxpR_I[jj]-1; n++){
+						userI = auxpR_J[auxpR_I[jj]+n];
+						for (k=0; k<=sendcounts_I[rank]-1; k++){
+							userJ = auxpR_J[auxpR_I[j]+k];
+							if (userI==userJ)
+								suma += 1;
+						}
+					}
+					//printf("soy %d -> item %d con item %d suma %Le\n",rank, j,jj,suma);
+					prod_interno[w] = suma;
+					w++;
+				}									
 			}
 			i++;
+			j = 0;
 		} else {
-			//MPI_Bcast(auxitem, tamItems, MPI_INT, i, comm);
-			//printf("soy %d y estoy esperando a recibir de %d\n", rank, i);
-			MPI_Probe(i, 0, comm, &status);
-	  		MPI_Get_count(&status, MPI_INT, &messagesize);
-	  		auxitem = malloc(sizeof(int) * messagesize);
-			MPI_Recv(auxitem, messagesize, MPI_INT, i, 0, comm, &status);
-			printf("soy %d me ha llegado el item %d y tiene ", rank, j);
-			for(k = 0; k < messagesize; k++)
-				printf("%d ", auxitem[k]);
-			printf("\n\n");
+			MPI_Bcast (&auxnorma, 1, MPI_LONG_DOUBLE, i, comm);
+			//printf ("soy %d -> auxnorma de rank %d = %Le\n", rank,i, auxnorma);
+			MPI_Probe(i, 1, comm, &status);
+			MPI_Get_count(&status, MPI_INT, &messagesize);
+			auxitem = malloc(sizeof(int) * messagesize);
+			MPI_Recv(auxitem, messagesize, MPI_INT, i, 1, comm, &status);
+			for (jj=0; jj<=sendcounts_I[rank]-1; jj++){
+				prod2N[w] = auxnorma*aux2norma[jj];
+				suma = 0;
+				if (jj==sendcounts_I[rank]-1)
+					tam = auxpR_I[jj+1]-cuantos;
+				else {
+					tam = auxpR_I[jj+1]-auxpR_I[jj];
+					cuantos += tam;
+				}
+				for (n=0; n<=tam-1; n++){
+					userI = auxpR_J[cuantos+n];
+					for (k=0; k<=messagesize-1; k++){
+						userJ = auxitem[k];
+						if (userI==userJ)
+							suma += 1;
+					}
+				}		
+				//printf("soy %d -> item %d con item %d suma %Le\n",rank,jj ,w ,suma);
+				prod_interno[w] = suma;
+				w++;
+			}
+			free (auxitem);
 			j++;
 			if (sendcounts_I[i] == j) {
 				i++;
 				j = 0;
-			}	
-		}
-		printf("soy %d y voy por la ite %d\n", rank, i);
+			} 
+		}	
 	}
-
-	/*for(i = 0; i <= sendcounts_I[rank] - 1; i++) {
-		MPI_Bcast (&auxpR_J[tamJ - auxpR_I[i]], auxpR_I[i+1] - auxpR_I[i], MPI_INT, rank, comm);
-	}*/
+	// acos en double
+	for (i=0; i<=sendcounts_I[rank]*(tamItems-1)-1; i++){
+		arcocoseno[i] = (long double) acos((double) prod_interno[i]/(double) prod2N[i]);
+		angulo[i] = ((double) arcocoseno[i]*(180.0/3.14159265));
+	}
+	
+	MPI_Barrier(comm);
+	
+	for (i=0 ; i<=nprocs-1; i++)
+		if (rank == i)
+			for (j=0; j<=sendcounts_I[rank]*(tamItems-1)-1; j++){
+				printf("soy %d -> prod_interno: pos %d res %Le\n", rank, j, prod_interno[j]);
+				printf("soy %d -> prod2N: pos %d res %Le\n", rank, j, prod2N[j]);
+				printf("soy %d -> acos: pos %d res %Le\n", rank, j, arcocoseno[j]);
+				printf("soy %d -> angulo: pos %d res %f\n", rank, j, angulo[j]);
+			}	
 	
 	if(rank == root) {
 		free (pR_J); free (pR_I);
@@ -220,6 +262,10 @@ int main (int argc, char *argv[]) {
     free (sendcounts_I);
 	free (auxpR_I);
 	free (auxpR_J);
+	free (aux2norma);
+	free (angulo);
+	free (prod_interno);
+	free (prod2N);
 
     MPI_Finalize();
 	return (0);
